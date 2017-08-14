@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="youtube">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <base href="http://localhost:8000/dist"/>
+    <title>MedPass</title>
+    <meta name="description" content="">
+    <meta http-equiv="Access-Control-Allow-Origin" content="*"/>
+    <meta http-equiv="Access-Control-Allow-Headers" content= "Cache-Control, Pragma, Origin, Authorization, Content-Type, X-Requested-With"/>
+    <meta http-equiv="Access-Control-Allow-Methods" content="GET, PUT, POST"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="css/main.min.css">
+    <link rel="icon" href="images/favicon.png">
+  </head>
+
+  <body ng-controller="MainCtrl as main">
+
+      <header class="header" ng-include="'./html/partials/header.html'"></header>
+
+      <content class="content" ui-view></content>
+
+      <script src="vendor/jquery.min.js"></script>
+
+      <script src="vendor/angular.min.js"></script>
+      <script src="vendor/angular-route.min.js"></script>
+      <script src="vendor/angular-ui-router.min.js"></script>
+      <script src="vendor/angular-animate.min.js"></script>
+      <script src="vendor/angular-messages.min.js"></script>
+
+      <script src="js/app.min.js"></script>
+      <script src="js/config.min.js"></script>
+      <script src="js/controller.min.js"></script>
+
+  </body>
+
+</html>

@@ -1,135 +1,200 @@
-/* gulp dependencies */
-var gulp = require('gulp');
-var less = require('gulp-less');
-var watch = require('gulp-watch');
-var imagemin = require('gulp-imagemin');
-var connect = require('gulp-connect');
-var concat = require('gulp-concat');
-var sourcemaps = require('gulp-sourcemaps');
-var uglify = require('gulp-uglify');
-var ngAnnotate = require('gulp-ng-annotate');
-var minifyCSS = require('gulp-minify-css');
-var lessDependents = require('gulp-less-dependents');
-var clean = require('gulp-clean');
-var bower = require('gulp-bower');
-var concat_vendor = require('gulp-concat-vendor');
-var jshint = require('gulp-jshint');
 
-/* path def */
-var path = {
-    HTML: [
-        'src/.htaccess',
-        'src/*.html',
-        'src/views/**/*.html',
-        'src/views/*.html',
-        'src/favicon.png'
-    ],
-    JS: [
-        'src/js/*.js',
-        'src/js/**/*.js'
-    ],
-    CSS: [
-        'src/css/*.css'
-    ],
-    LESS: [
-        'src/less/style.less'
-    ],
-    LESS_ALL: [
-        'src/less/*.less'
-    ],
-    IMG: [
-        'src/img/**'
-    ],
-    VENDOR: [
-        'bower_components/angular/angular.js',
-        'bower_components/angular-animate/angular-animate.js',
-        'bower_components/angular-aria/angular-aria.js',
-        'bower_components/angular-messages/angular-messages.js',
-        'bower_components/angular-sanitize/angular-sanitize.js',
-        'bower_components/angular-ui-router/release/angular-ui-router.js'
-        // ...and more
-    ],
-    DIST: './dist'
-};
+var gulp = require('gulp'),
 
-/* spin up distribution server */
-gulp.task('connect', function() {
-    connect.server({
-        root: 'dist',
-        port: 8000
+    // Util
+    del = require('del'),
+    copy = require('copy'),
+    cache = require('gulp-cache'),
+    watch = require('gulp-watch'),
+    stream = require('event-stream'),
+    concat = require('gulp-concat'),
+    rename = require('gulp-rename'),
+    uglify = require('gulp-uglify'),
+    replace = require('gulp-string-replace'),
+    connect = require('gulp-connect'),
+    imagemin = require('gulp-imagemin'),
+    livereload = require('gulp-livereload'),
+    sourcemaps = require('gulp-sourcemaps'),
+    autoprefixer = require('gulp-autoprefixer'),
+
+    // Style
+    sass = require('gulp-sass'),
+    cssnano = require('gulp-cssnano'),
+    minifycss = require('gulp-minify-css'),
+    autoprefixer = require('gulp-autoprefixer'),
+
+    // Tests
+    server = require('karma').Server,
+
+    // Javascript
+    jshint = require('gulp-jshint'),
+
+    // Angular
+    ngAnnotate = require('gulp-ng-annotate');
+
+    // Paths
+    var paths = {
+        app : {
+            file: './app/index.html',
+            html: './app/html/**/*.html',
+            scss: './app/scss/**/*.scss',
+            js: './app/js/**/*.js',
+            node: './node_modules/**'
+        },
+        dist : {
+            root: './dist',
+            css: './dist/css',
+            js: './dist/js',
+            html: './dist/html',
+            lib: './dist/lib'
+        }
+    };
+
+    // Start server port 8000
+    gulp.task('connect', function() {
+        connect.server({
+            root: './dist',
+            port: 8000,
+            livereload:true
+        });
     });
-});
 
-/* clean up dist dir */
-gulp.task('clean', function() {
-    return gulp.src('./dist/*', {force: true})
-        .pipe(clean());
-});
+    // Copy
+    gulp.task('copy', function() {
+        gulp.src(paths.app.html)
+            .pipe(gulp.dest(paths.dist.html))
 
-/* jslint for debugging */
-gulp.task('lint', function() {
-    return gulp.src(path.JS)
-        .pipe(jshint())
-        .pipe(jshint.reporter('default'))
+        gulp.src(paths.app.file)
+            .pipe(gulp.dest(paths.dist.root));
+    });
+
+
+    // Test TDD
+    gulp.task('tdd', function (done) {
+        new Server({
+            configFile: __dirname + '/karma.conf.js',
+        }, done).start();
+    });
+
+    // Test PhantomJS and Jasmine
+    gulp.task('test', function (done) {
+        return new Server({
+            configFile: __dirname + '/karma.conf.js',
+            singleRun: true
+        }, done).start();
+    });
+
+
+    gulp.task('styles', function () {
+        return gulp.src(paths.app.scss)
+        .pipe(sass().on('error', sass.logError))
+        .pipe(rename({ suffix: '.min' }))
+        .pipe(cssnano())
+        .pipe(sourcemaps.write('.'))
+        .pipe(gulp.dest(paths.dist.css));
+    });
+
+    // // Styles
+    // gulp.task('styles', () =>
+    //     sass(paths.app.scss)
+    // 		.on('error', sass.logError)
+    //         .pipe(sourcemaps.init())
+    //         .pipe(autoprefixer())
+    //         .pipe(gulp.dest(paths.app.scss))
+    //         .pipe(rename({ suffix: '.min' }))
+    //         .pipe(cssnano())
+    //         .pipe(sourcemaps.write('.'))
+    //         .pipe(gulp.dest(paths.dist.css))
+    // );
+
+    // Styles
+    // gulp.task('styles', function() {
+    //   return sass('app/scss/main.scss', { style: 'expanded' })
+    //     .pipe(sourcemaps.init())
+    //     .pipe(autoprefixer())
+    //     .pipe(rename({ suffix: '.min' }))
+    //     .pipe(cssnano())
+    //     .pipe(sourcemaps.write('.'))
+    //     .pipe(gulp.dest(paths.dist.css))
+    //     // .pipe(notify({ message: 'Styles task complete' }));
+    // });
+
+
+
+
+
+    // Js structure sintax
+    gulp.task('lint', function() {
+        return gulp.src(paths.app.js)
+        .pipe(jshint()).on('error', errorHandler)
+        .pipe(jshint.reporter('jshint-stylish'))
         .pipe(jshint.reporter('fail'));
-});
+    });
 
-/* move css */
-gulp.task('css', function () {
-    gulp.src(path.CSS)
-        .pipe(gulp.dest(path.DIST + '/css'));
-});
+    // Scripts
+    gulp.task('scripts', function() {
+        return stream.concat(
+            gulp.src('app/js/app.js')
+                .pipe(rename({ suffix: '.min' }))
+                //.pipe(uglify())
+                .pipe(gulp.dest(paths.dist.js)),
 
-/* compile less */
-gulp.task('less', function () {
-    gulp.src(path.LESS)
-        .pipe(lessDependents())
-        .pipe(less())
-        .pipe(minifyCSS())
-        .pipe(gulp.dest(path.DIST + '/css'));
-});
+            gulp.src('app/js/controllers/**/*.js')
+                .pipe(concat('controller.js'))
+                .pipe(rename({ suffix: '.min' }))
+                //.pipe(uglify())
+                .pipe(gulp.dest(paths.dist.js)),
 
-/* concat and compress app scripts */
-gulp.task('js', function () {
-    gulp.src(path.JS)
-        .pipe(sourcemaps.init())
-        .pipe(concat('app.js'))
-        .pipe(ngAnnotate())
-        .pipe(uglify())
-        .pipe(sourcemaps.write())
-        .pipe(gulp.dest(path.DIST + '/js'));
-});
+            gulp.src('app/js/configs/**/*.js')
+                .pipe(concat('config.js'))
+                .pipe(rename({ suffix: '.min' }))
+                //.pipe(uglify())
+                .pipe(gulp.dest(paths.dist.js))
+        );
+    });
 
-/* concat vendor dependencies */
-gulp.task('vendor', function () {
-    gulp.src(path.VENDOR)
-        .pipe(concat('vendor.js'))
-        .pipe(ngAnnotate())
-        .pipe(uglify())
-        .pipe(gulp.dest(path.DIST + '/js'));
-});
 
-/* copy over markups */
-gulp.task('html', function(){
-    gulp.src(path.HTML, {base: 'src'})
-        .pipe(gulp.dest(path.DIST));
-});
+    // Images
+    gulp.task('images', function() {
+        return gulp.src('app/images/**/*')
+            .pipe(cache(imagemin({ optimizationLevel: 3, progressive: true, interlaced: true })))
+            .pipe(gulp.dest('../medic/images'));
+            // .pipe(notify({ message: 'Images task complete' }));
+    });
 
-/* compress images */
-gulp.task('img', function(){
-    gulp.src(path.IMG)
-        .pipe(imagemin())
-        .pipe(gulp.dest(path.DIST + '/img'));
-});
 
-/* watch all changes */
-gulp.task('watch', function () {
-    gulp.watch(path.LESS_ALL, ['less']);
-    gulp.watch(path.VENDOR, ['vendor']);
-    gulp.watch(path.JS, ['lint', 'js']);
-    gulp.watch(path.HTML, ['html']);
-    gulp.watch(path.IMG, ['img']);
-});
+    // Vendor
+    gulp.task('vendor', function() {
+      return gulp.src(
+          [
+            'node_modules/jquery/dist/jquery.min.js',
+            'node_modules/angular/angular.min.js',
+            'node_modules/angular-animate/angular-animate.min.js',
+            'node_modules/angular-messages/angular-messages.min.js',
+            'node_modules/angular-route/angular-route.min.js',
+            'node_modules/ui-router/release/angular-ui-router.min.js',
+            'node_modules/angular-loader/angular-loader.min.js'
+          ])
+          .pipe(ngAnnotate())
+          .pipe(gulp.dest('./dist/vendor'))
 
-/* defualt */
-gulp.task('default', all_tasks);
+    });
+
+    // Clean
+    gulp.task('clean', function() {
+        return del(paths.dist.root, {force: true});
+    });
+
+
+    // Watch for change
+    gulp.task('watch', function() {
+        livereload.listen();
+            gulp.watch(paths.app.html).on('change', livereload.changed);
+            gulp.watch(paths.app.sass, ['styles']).on('change', livereload.changed);
+            gulp.watch(paths.app.js, ['lint']).on('change', livereload.changed);
+    });
+
+    // Default task
+    gulp.task('default', ['clean'], function() {
+        gulp.start('connect','styles', 'scripts', 'vendor', 'images', 'copy', 'watch');
+    });
